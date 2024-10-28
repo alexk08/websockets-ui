@@ -1,4 +1,6 @@
 import { WebSocketServer } from 'ws';
+import { BaseMessage, BasePlayerData, RegPlayerInMsg, RegPlayerOutMsg } from '../types';
+import { createPlayer } from '../controller';
 
 const WS_PORT = 3050;
 
@@ -20,12 +22,18 @@ ws.on('connection', function connection(ws, req) {
 
   // принимаем JSON
   ws.on('message', function message(rawData) {
-    const data = JSON.parse(rawData.toString());
-    console.log(remoteAddress);
+    const data = JSON.parse(rawData.toString()) as BaseMessage;
     console.log('Data from  %s : %j', remoteAddress, data);
 
-    if (data.success && data.success.count == 40) {
-      // TODO: Call an url ...
+    if (data.type === 'reg') {
+      const player = JSON.parse((data as RegPlayerInMsg).data as unknown as string) as BasePlayerData;
+      const outData = createPlayer(player);
+      const outMsg: RegPlayerOutMsg = { type: 'reg', data: JSON.stringify(outData) as BaseMessage['data'], id: 0 };
+      ws.send(JSON.stringify(outMsg));
     }
+  });
+
+  ws.on('close', () => {
+    ws.close();
   });
 });

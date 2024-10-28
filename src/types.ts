@@ -16,7 +16,12 @@ export type ShipType = 'small' | 'medium' | 'large' | 'huge';
 
 export type AttackStatus = 'miss' | 'killed' | 'shot';
 
-export type PlayerDataIn = {
+export type PlayerErr = {
+  error: boolean;
+  errorText: string;
+};
+
+export type BasePlayerData = {
   name: string;
   password: string;
 };
@@ -24,9 +29,7 @@ export type PlayerDataIn = {
 export type PlayerDataOut = {
   name: string;
   index: number | string;
-  error: boolean;
-  errorText: string;
-};
+} & PlayerErr;
 
 export type Winner = {
   name: string;
@@ -124,12 +127,12 @@ export interface BaseMessage {
  */
 export interface RegPlayerInMsg extends BaseMessage {
   type: 'reg';
-  data: PlayerDataIn;
+  // data: BasePlayerData;
 }
 
 export interface RegPlayerOutMsg extends BaseMessage {
   type: 'reg';
-  data: PlayerDataOut;
+  // data: PlayerDataOut;
 }
 
 /**
@@ -230,3 +233,9 @@ export interface FinishGameOutMsg extends BaseMessage {
   type: 'finish';
   data: WinInfo;
 }
+
+// Models
+
+export type Player = {
+  id: string;
+} & BasePlayerData;
