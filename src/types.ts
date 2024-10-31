@@ -21,15 +21,17 @@ export type PlayerErr = {
   errorText: string;
 };
 
-export type BasePlayerData = {
+export type PlayerData = {
   name: string;
   password: string;
 };
 
-export type PlayerDataOut = {
+export type BasePlayer = {
   name: string;
   index: number | string;
-} & PlayerErr;
+};
+
+export type PlayerDataOut = BasePlayer & PlayerErr;
 
 export type Winner = {
   name: string;
@@ -116,7 +118,7 @@ export type WinInfo = {
 
 export interface BaseMessage {
   type: CommandType;
-  data: Record<string, unknown> | Record<string, unknown>[] | '';
+  data: string;
   id: 0;
 }
 
@@ -125,20 +127,20 @@ export interface BaseMessage {
 /**
  * Login or create player
  */
-export interface RegPlayerInMsg extends BaseMessage {
+export interface RegPlayerInMsg {
   type: 'reg';
-  // data: BasePlayerData;
+  data: PlayerData;
 }
 
-export interface RegPlayerOutMsg extends BaseMessage {
+export interface RegPlayerOutMsg {
   type: 'reg';
-  // data: PlayerDataOut;
+  data: PlayerDataOut;
 }
 
 /**
  * Update winners (for all after every winners table update)
  */
-export interface UpdWinnersOutMsg extends BaseMessage {
+export interface UpdWinnersOutMsg {
   type: 'update_winners';
   data: Winner[];
 }
@@ -148,15 +150,15 @@ export interface UpdWinnersOutMsg extends BaseMessage {
 /**
  * Create new room (create game room and add yourself there)
  */
-export interface CreateRoomInMsg extends BaseMessage {
+export interface CreateRoomInMsg {
   type: 'create_room';
-  date: '';
+  data: '';
 }
 
 /**
  * Add user to room (add youself to somebodys room, then remove the room from available rooms list)
  */
-export interface AddUserToRoomInMsg extends BaseMessage {
+export interface AddUserToRoomInMsg {
   type: 'add_user_to_room';
   data: Room;
 }
@@ -164,7 +166,7 @@ export interface AddUserToRoomInMsg extends BaseMessage {
 /**
  * send for both players in the room, after they are connected to the room
  */
-export interface CreateGameOutMsg extends BaseMessage {
+export interface CreateGameOutMsg {
   type: 'create_game';
   data: Game;
 }
@@ -172,7 +174,7 @@ export interface CreateGameOutMsg extends BaseMessage {
 /**
  * Update room state (send rooms list, where only one player inside)
  */
-export interface UpdateRoomOutMsg extends BaseMessage {
+export interface UpdateRoomOutMsg {
   type: 'update_room';
   data: RoomState[];
 }
@@ -182,7 +184,7 @@ export interface UpdateRoomOutMsg extends BaseMessage {
 /**
  * Add ships to the game board
  */
-export interface AddShipInMsg extends BaseMessage {
+export interface AddShipInMsg {
   type: 'add_ships';
   data: AddShipData;
 }
@@ -190,7 +192,7 @@ export interface AddShipInMsg extends BaseMessage {
 /**
  * Start game (only after server receives both player's ships positions)
  */
-export interface StartGameOutMsg extends BaseMessage {
+export interface StartGameOutMsg {
   type: 'start_game';
   data: StartGameData;
 }
@@ -200,7 +202,7 @@ export interface StartGameOutMsg extends BaseMessage {
 /**
  * Attack msg from client
  */
-export interface AttackInMsg extends BaseMessage {
+export interface AttackInMsg {
   type: 'attack';
   data: AttackInData;
 }
@@ -208,12 +210,12 @@ export interface AttackInMsg extends BaseMessage {
 /**
  * Attack feedback (should be sent after every shot, miss and after kill sent miss for all cells around ship too)
  */
-export interface AttackOutMsg extends BaseMessage {
+export interface AttackOutMsg {
   type: 'attack';
   data: AttackOutData;
 }
 
-export interface RandomAttackInMsg extends BaseMessage {
+export interface RandomAttackInMsg {
   type: 'randomAttack';
   data: BaseGameData;
 }
@@ -221,7 +223,7 @@ export interface RandomAttackInMsg extends BaseMessage {
 /**
  * Info about player's turn (send after game start and every attack, miss or kill result)
  */
-export interface PlayerInfoOutMsg extends BaseMessage {
+export interface PlayerInfoOutMsg {
   type: 'turn';
   data: GameSession;
 }
@@ -229,7 +231,7 @@ export interface PlayerInfoOutMsg extends BaseMessage {
 /**
  * Finish game
  */
-export interface FinishGameOutMsg extends BaseMessage {
+export interface FinishGameOutMsg {
   type: 'finish';
   data: WinInfo;
 }
@@ -237,5 +239,5 @@ export interface FinishGameOutMsg extends BaseMessage {
 // Models
 
 export type Player = {
-  id: string;
-} & BasePlayerData;
+  index: string | number;
+} & PlayerData;
