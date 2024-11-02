@@ -1,98 +1,103 @@
-import { WebSocketServer } from 'ws';
-import { PlayerData, PlayerDataOut, Room } from '../types';
-import { addToRoom, createPlayer, createRoom, getRooms, getWinners } from '../controller';
+import { WebSocket, WebSocketServer } from 'ws';
+import { AddShipData, PlayerData, PlayerDataOut, Room } from '../types';
+import {
+  addShips,
+  checkGameIsReady,
+  createGame,
+  createPlayer,
+  createRoom,
+  getAvailableRooms,
+  getGames,
+  getWinners,
+} from '../controller';
 import { formatInMsg, formatOutMsg } from '../utils';
 
 const WS_PORT = 3050;
 
 const ws = new WebSocketServer({ port: WS_PORT });
 
-ws.on('connection', function connection(client, req) {
+ws.on('connection', function connection(wsClient, req) {
   const remoteAddress = req.socket.remoteAddress;
   let player: null | PlayerDataOut = null;
 
   // Обработка ошибки
-  client.on('error', console.error);
+  wsClient.on('error', console.error);
 
-  // // Отправляем JSON
-  // ws.send(
-  //   JSON.stringify({
-  //     cmd: 'getuserlist',
-  //     stn: true,
-  //   }),
-  // );
-
-  // принимаем JSON
-  client.on('message', function message(rawData) {
+  wsClient.on('message', function message(rawData) {
     const { type, data } = formatInMsg(rawData);
     console.log('Data from  %s : %j', remoteAddress, data);
 
     if (type === 'reg') {
       const playerParams = data as PlayerData;
-      console.log('createdPlayer before creation on specific connection, means specific client', player);
-      player = createPlayer(playerParams);
+      player = createPlayer(playerParams, wsClient);
 
       const createPlayerOutMsg = formatOutMsg({ data: player, type });
-      const updateWinnersOutMsg = formatOutMsg({ data: getWinners(), type: 'update_winners' });
-      const updatedRoomOutMsg = formatOutMsg({ data: getRooms(), type: 'update_room' });
+      wsClient.send(createPlayerOutMsg);
 
-      for (const cl of ws.clients) {
-        cl.send(createPlayerOutMsg);
-        cl.send(updateWinnersOutMsg);
-        cl.send(updatedRoomOutMsg);
-      }
-
-      // client.send(createPlayerOutMsg);
-      // // ws.emit('updateWinners');
-      // // ws.emit('updateRooms');
-      // client.send(updateWinnersOutMsg);
-      // client.send(updatedRoomOutMsg);
+      ws.emit('updateWinners');
+      ws.emit('updateRooms');
     }
 
     if (type === 'create_room') {
-      console.log(player);
       if (!player) return;
       createRoom({ index: player.index, name: player.name });
-      // ws.emit('updateRooms');
-
-      const updatedRoomOutMsg = formatOutMsg({ data: getRooms(), type: 'update_room' });
-      const updateWinnersOutMsg = formatOutMsg({ data: getWinners(), type: 'update_winners' });
-
-      // client.send(updatedRoomOutMsg);
-      // client.send(updateWinnersOutMsg);
-
-      for (const cl of ws.clients) {
-        cl.send(updateWinnersOutMsg);
-        cl.send(updatedRoomOutMsg);
-      }
+      ws.emit('updateWinners');
+      ws.emit('updateRooms');
     }
 
     if (type === 'add_user_to_room') {
       if (!player) return;
       const roomId = (data as Room).indexRoom;
-      addToRoom(roomId, { index: player.index, name: player.name });
+      const game = createGame(roomId, player.index);
+      if (!game) return;
 
-      const updatedRoomOutMsg = formatOutMsg({ data: getRooms(), type: 'update_room' });
+      ws.emit('updateRooms');
 
-      client.send(updatedRoomOutMsg);
+      game.gamePLayers.forEach(item => {
+        if (item.player.socket.readyState === WebSocket.OPEN) {
+          const msg = formatOutMsg({ data: { idGame: game.idGame, idPlayer: item.player.index }, type: 'create_game' });
+          item.player.socket.send(msg);
+        }
+      });
+    }
 
-      for (const cl of ws.clients) {
-        cl.send(updatedRoomOutMsg);
-      }
+    if (type === 'add_ships') {
+      const shipData = data as AddShipData;
+      addShips(shipData);
+      if (!checkGameIsReady(shipData.gameId)) return;
+
+      const game = getGames().find(game => game.idGame === shipData.gameId);
+      game?.gamePLayers.forEach(item => {
+        if (item.player.socket.readyState === WebSocket.OPEN) {
+          const msg = formatOutMsg({
+            data: { ships: item.ships, currentPlayerIndex: item.player.index },
+            type: 'start_game',
+          });
+          item.player.socket.send(msg);
+        }
+      });
     }
   });
 
-  // ws.on('updateWinners', () => {
-  //   const updateWinnersOutMsg = formatOutMsg({ data: getWinners(), type: 'update_winners' });
-  //   ws.send(updateWinnersOutMsg);
-  // });
+  wsClient.on('close', () => {
+    wsClient.close();
+  });
+});
 
-  // ws.on('updateRooms', () => {
-  //   const updatedRoomOutMsg = formatOutMsg({ data: getRooms(), type: 'update_room' });
-  //   ws.send(updatedRoomOutMsg);
-  // });
+ws.on('updateWinners', () => {
+  const updateWinnersOutMsg = formatOutMsg({ data: getWinners(), type: 'update_winners' });
+  ws.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(updateWinnersOutMsg);
+    }
+  });
+});
 
-  client.on('close', () => {
-    client.close();
+ws.on('updateRooms', () => {
+  const updatedRoomOutMsg = formatOutMsg({ data: getAvailableRooms(), type: 'update_room' });
+  ws.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(updatedRoomOutMsg);
+    }
   });
 });

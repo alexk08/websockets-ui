@@ -1,18 +1,13 @@
 import WebSocket from 'ws';
-import { CommandType, BaseMessage } from './types';
+import { OutMsgMap, CommandTypeOut, BaseInMessage, BaseOutMessage } from './types';
 
 export const formatInMsg = (rawData: WebSocket.RawData) => {
-  const { type, data } = JSON.parse(rawData.toString()) as BaseMessage;
+  const { type, data } = JSON.parse(rawData.toString()) as BaseInMessage;
   return { type, data: data ? (JSON.parse(data) as Record<string, unknown> | Record<string, unknown>[]) : data };
 };
 
-export const formatOutMsg = <DataType extends Record<string, unknown> | Record<string, unknown>[]>({
-  type,
-  ...rest
-}: {
-  data: DataType;
-  type: CommandType;
-}) => {
+export const formatOutMsg = <T extends CommandTypeOut>({ type, ...rest }: OutMsgMap[T]) => {
   const data = JSON.stringify(rest.data);
-  return JSON.stringify({ data, type, id: 0 });
+  const msg: BaseOutMessage = { data, type, id: 0 };
+  return JSON.stringify(msg);
 };
