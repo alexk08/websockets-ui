@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { OutMsgMap, CommandTypeOut, BaseInMessage, BaseOutMessage } from './types';
+import { OutMsgMap, CommandTypeOut, BaseInMessage, BaseOutMessage, CommandType } from './types';
 
 export const formatInMsg = (rawData: WebSocket.RawData) => {
   const { type, data } = JSON.parse(rawData.toString()) as BaseInMessage;
@@ -11,3 +11,5 @@ export const formatOutMsg = <T extends CommandTypeOut>({ type, ...rest }: OutMsg
   const msg: BaseOutMessage = { data, type, id: 0 };
   return JSON.stringify(msg);
 };
+
+export const log = (type: CommandType, value?: unknown) => console.log(`Command result for ${type}:`, value ?? '');

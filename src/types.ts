@@ -4,7 +4,6 @@ export type CommandTypeIn = 'reg' | 'create_room' | 'add_user_to_room' | 'add_sh
 export type CommandTypeOut =
   | 'reg'
   | 'update_winners'
-  | 'create_room'
   | 'create_game'
   | 'update_room'
   | 'start_game'
@@ -249,7 +248,6 @@ export interface FinishGameOutMsg {
 export type OutMsgMap = {
   reg: RegPlayerOutMsg;
   update_winners: UpdWinnersOutMsg;
-  create_room: UpdateRoomOutMsg;
   create_game: CreateGameOutMsg;
   update_room: UpdateRoomOutMsg;
   start_game: StartGameOutMsg;

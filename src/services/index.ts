@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws';
 import { PlayerError } from '../error';
-import { PlayerData, Player, RoomState, BasePlayer, Winner, Game, AddShipData } from '../types';
+import { PlayerData, Player, RoomState, Winner, Game, AddShipData } from '../types';
 import { v4 as uuid_v4 } from 'uuid';
 
 export class GameService {
@@ -16,17 +16,16 @@ export class GameService {
     this.games = [];
   }
 
-  createPlayer(player: PlayerData, socket: WebSocket) {
+  createPlayer(player: PlayerData, socket: WebSocket, index: string | number) {
     this.validatePlayer(player);
-    const index = uuid_v4();
     const newPlayer: Player = { ...player, index, socket };
     this.players.push(newPlayer);
     return newPlayer;
   }
 
-  createRoom(player: BasePlayer) {
+  createRoom(playerIndex: string | number) {
     const roomId = uuid_v4();
-    const roomUser = this.players.find(item => item.index === player.index);
+    const roomUser = this.players.find(item => item.index === playerIndex);
     if (!roomUser) return null;
 
     const newRoom: RoomState = { roomId, roomUsers: [roomUser] };
@@ -50,12 +49,13 @@ export class GameService {
   }
 
   addShips(shipData: AddShipData) {
-    const gamePlayer = this.games
-      .find(game => game.idGame === shipData.gameId)
-      ?.gamePLayers.find(gamePlayer => gamePlayer.player.index === shipData.indexPlayer);
+    const game = this.games.find(game => game.idGame === shipData.gameId);
+    const gamePlayer = game?.gamePLayers.find(gamePlayer => gamePlayer.player.index === shipData.indexPlayer);
 
     if (!gamePlayer) return;
     gamePlayer.ships = shipData.ships;
+
+    return game;
   }
 
   checkGameIsReady(idGame: string | number) {
