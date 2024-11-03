@@ -74,14 +74,22 @@ export class GameService {
     return this.games.find(game => game.idGame === idGame)?.gamePLayers.every(player => !!player.ships.length);
   }
 
-  attack(attackData: AttackInData): AttackOutData & { enemyId: string | number | undefined } {
+  attack(attackData: AttackInData): (AttackOutData & { enemyId: string | number }) | undefined {
     const { gameId, x, y, indexPlayer } = attackData;
-    const game = this.games.find(game => game.idGame === gameId);
-    const enemy = game?.gamePLayers.find(item => item.player.index !== indexPlayer);
-    const enemyShips = enemy?.ships ?? [];
+    const nextPlayerId = this.getNextPlayer(gameId);
+    const isRightTurn = this.checkIsRightTurn({ nextPlayerId, currentShoter: indexPlayer, x, y, gameId });
+    if (!isRightTurn) return;
 
-    const client = game?.gamePLayers.find(item => item.player.index === indexPlayer);
-    const clientShots = client?.shots ?? [];
+    const game = this.games.find(game => game.idGame === gameId);
+    if (!game) return;
+
+    const enemy = game.gamePLayers.find(item => item.player.index !== indexPlayer);
+    const client = game.gamePLayers.find(item => item.player.index === indexPlayer);
+    if (!enemy || !client) return;
+
+    const enemyShips = enemy.ships;
+    const clientShots = client.shots;
+
     clientShots.push({ x, y });
 
     const isShot = enemyShips.some(ship => this.checkShipIsShot(ship, { x, y }));
@@ -90,7 +98,7 @@ export class GameService {
       position: { x, y },
       status: isShot ? 'shot' : 'miss',
       currentPlayer: indexPlayer,
-      enemyId: enemy?.player.index,
+      enemyId: enemy.player.index,
     };
   }
 
@@ -100,15 +108,16 @@ export class GameService {
 
     const client = game?.gamePLayers.find(item => item.player.index === indexPlayer);
     const clientShots = client?.shots ?? [];
-    const randomShots = [];
+    const allShots = [];
 
     for (let x = 0; x < 10; x++) {
       for (let y = 0; y < 10; y++) {
-        randomShots.push({ x, y });
+        allShots.push({ x, y });
       }
     }
 
-    const { x, y } = randomShots.find(({ x, y }) => !clientShots.some(shot => shot.x !== x && shot.y !== y)) ?? {
+    const shuffledShots = allShots.sort(() => Math.random() - 0.5);
+    const { x, y } = shuffledShots.find(({ x, y }) => !clientShots.some(shot => shot.x === x && shot.y === y)) ?? {
       x: 0,
       y: 0,
     };
@@ -130,11 +139,21 @@ export class GameService {
   checkIsRightTurn({
     nextPlayerId,
     currentShoter,
+    gameId,
+    x,
+    y,
   }: {
     nextPlayerId: string | number | undefined;
     currentShoter: string | number;
+    gameId: string | number;
+    x: number;
+    y: number;
   }) {
-    return nextPlayerId === currentShoter;
+    const isPreviousTurn = this.games
+      .find(game => game.idGame === gameId)
+      ?.gamePLayers.find(player => player.player.index === currentShoter)
+      ?.shots.some(shot => shot.x === x && shot.y === y);
+    return nextPlayerId === currentShoter && !isPreviousTurn;
   }
 
   saveNextPlayer({ id, gameId }: { id: string | number; gameId: string | number }) {

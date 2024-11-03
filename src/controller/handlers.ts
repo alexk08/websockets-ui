@@ -82,11 +82,10 @@ export const handleAddShips = ({ clientId, shipData }: HandleParams & { shipData
 };
 
 export const handleAttack = ({ attackData }: { attackData: AttackInData }) => {
-  const nextPlayerId = game.getNextPlayer(attackData.gameId);
-  if (!game.checkIsRightTurn({ nextPlayerId, currentShoter: attackData.indexPlayer })) return;
-  const { enemyId, ...resultOfAttack } = game.attack(attackData);
+  const attack = game.attack(attackData);
+  if (!attack) return;
 
-  if (!enemyId) return;
+  const { enemyId, ...resultOfAttack } = attack;
   const currentGame = game.getGames().find(game => game.idGame === attackData.gameId);
   const turnData = { currentPlayer: resultOfAttack.status === 'miss' ? enemyId : attackData.indexPlayer };
   game.saveNextPlayer({ gameId: attackData.gameId, id: turnData.currentPlayer });
@@ -108,8 +107,6 @@ export const handleAttack = ({ attackData }: { attackData: AttackInData }) => {
 };
 
 export const handleRandomAttack = ({ attackData }: { attackData: BaseGameData }) => {
-  const nextPlayerId = game.getNextPlayer(attackData.gameId);
-  if (!game.checkIsRightTurn({ nextPlayerId, currentShoter: attackData.indexPlayer })) return;
   const randomAttackData = game.randomAttack(attackData);
   handleAttack({ attackData: randomAttackData });
 };
