@@ -1,13 +1,13 @@
-import { WebSocket, Server } from 'ws';
+import { WebSocket } from 'ws';
 import { PlayerError } from '../error';
 import { GameService } from '../services';
-import { PlayerData, PlayerDataOut, AddShipData, Room } from '../types';
+import { PlayerData, PlayerDataOut, AddShipData, Room, AttackInData } from '../types';
 import { formatOutMsg, log } from '../utils';
+import { ws } from '../ws_server';
 
 const game = new GameService();
 
 export const handleRegistration = ({
-  ws,
   wsClient,
   playerParams,
   clientId,
@@ -23,28 +23,28 @@ export const handleRegistration = ({
     const createPlayerOutMsg = formatOutMsg({ data: playerResult, type: 'reg' });
     wsClient.send(createPlayerOutMsg);
 
-    ws?.emit('updateWinners');
-    ws?.emit('updateRooms');
+    ws.emit('updateWinners');
+    ws.emit('updateRooms');
 
     log('reg', playerResult);
   }
 };
 
-export const handleCreateRoom = ({ ws, clientId }: HandleParams) => {
+export const handleCreateRoom = ({ clientId }: HandleParams) => {
   if (!clientId) return;
   const room = game.createRoom(clientId);
-  ws?.emit('updateWinners');
-  ws?.emit('updateRooms');
+  ws.emit('updateWinners');
+  ws.emit('updateRooms');
 
   log('create_room', room);
 };
 
-export const handleAddUserToRoom = ({ ws, clientId, room }: HandleParams & { room: Room }) => {
+export const handleAddUserToRoom = ({ clientId, room }: HandleParams & { room: Room }) => {
   if (!clientId) return;
   const createdGame = game.createGame(room.indexRoom, clientId);
   if (!createdGame) return;
 
-  ws?.emit('updateRooms');
+  ws.emit('updateRooms');
 
   createdGame.gamePLayers.forEach(item => {
     if (item.player.socket.readyState === WebSocket.OPEN) {
@@ -69,17 +69,42 @@ export const handleAddShips = ({ shipData }: HandleParams & { shipData: AddShipD
         data: { ships: item.ships, currentPlayerIndex: item.player.index },
         type: 'start_game',
       });
+      const turnMsg = formatOutMsg({ type: 'turn', data: { currentPlayer: item.player.index } });
       item.player.socket.send(msg);
+      item.player.socket.send(turnMsg);
     }
   });
 
   log('start_game', currentGame);
+  log('turn');
 };
 
-export const handleUpdateWinners = ({ ws }: HandleParams) => {
+export const handleAttack = ({ attackData, clientId }: HandleParams & { attackData: AttackInData }) => {
+  if (!clientId) return;
+  const resultOfAttack = game.attack(attackData);
+  const currentGame = game.getGames().find(game => game.idGame === attackData.gameId);
+
+  currentGame?.gamePLayers.forEach(item => {
+    if (item.player.socket.readyState === WebSocket.OPEN) {
+      const msg = formatOutMsg({
+        data: resultOfAttack(item.player.index),
+        type: 'attack',
+      });
+      const turnMsg = formatOutMsg({ type: 'turn', data: { currentPlayer: item.player.index } });
+      item.player.socket.send(msg);
+      item.player.socket.send(turnMsg);
+
+      log('attack', resultOfAttack(item.player.index));
+    }
+  });
+
+  log('turn');
+};
+
+export const handleUpdateWinners = () => {
   const data = game.getWinners();
   const updateWinnersOutMsg = formatOutMsg({ data, type: 'update_winners' });
-  ws?.clients.forEach(client => {
+  ws.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(updateWinnersOutMsg);
     }
@@ -88,10 +113,10 @@ export const handleUpdateWinners = ({ ws }: HandleParams) => {
   log('update_winners', data);
 };
 
-export const handleUpdateRooms = ({ ws }: HandleParams) => {
+export const handleUpdateRooms = () => {
   const data = game.getAvailableRooms();
   const updatedRoomOutMsg = formatOutMsg({ data, type: 'update_room' });
-  ws?.clients.forEach(client => {
+  ws.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(updatedRoomOutMsg);
     }
@@ -100,8 +125,16 @@ export const handleUpdateRooms = ({ ws }: HandleParams) => {
   log('update_room', data);
 };
 
+export const handleShutDownServer = () => {
+  console.log('\nShutting down WebSocket server...');
+  ws.clients.forEach(client => client.close());
+  ws.close(() => {
+    console.log('WebSocket server closed');
+    process.exit(0);
+  });
+};
+
 export type HandleParams = {
-  ws?: Server;
   wsClient?: WebSocket;
   clientId?: string | number;
 };

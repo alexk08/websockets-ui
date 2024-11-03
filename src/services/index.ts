@@ -1,6 +1,17 @@
 import { WebSocket } from 'ws';
 import { PlayerError } from '../error';
-import { PlayerData, Player, RoomState, Winner, Game, AddShipData } from '../types';
+import {
+  PlayerData,
+  Player,
+  RoomState,
+  Winner,
+  Game,
+  AddShipData,
+  AttackInData,
+  Ship,
+  Position,
+  AttackOutData,
+} from '../types';
 import { v4 as uuid_v4 } from 'uuid';
 
 export class GameService {
@@ -60,6 +71,31 @@ export class GameService {
 
   checkGameIsReady(idGame: string | number) {
     return this.games.find(game => game.idGame === idGame)?.gamePLayers.every(player => !!player.ships.length);
+  }
+
+  attack(attackData: AttackInData): (currentPlayer: string | number) => AttackOutData {
+    const { gameId, x, y, indexPlayer } = attackData;
+    const enemyShips =
+      this.games.find(game => game.idGame === gameId)?.gamePLayers.find(item => item.player.index !== indexPlayer)
+        ?.ships ?? [];
+
+    const isShot = enemyShips.some(ship => this.checkShipIsShot(ship, { x, y }));
+    return (currentPlayer: string | number) => ({
+      position: { x, y },
+      status: isShot ? 'shot' : 'miss',
+      currentPlayer,
+    });
+  }
+
+  checkShipIsShot(ship: Ship, shotPosition: Position) {
+    const { x, y } = shotPosition;
+    const { direction, length, position } = ship;
+    const shipObj = {
+      x: !direction ? Array.from({ length }, (_, i) => i + position.x) : [position.x],
+      y: direction ? Array.from({ length }, (_, i) => i + position.y) : [position.y],
+    };
+
+    return shipObj.x.some(value => value === x) && shipObj.y.some(value => value === y);
   }
 
   getAvailableRooms() {
