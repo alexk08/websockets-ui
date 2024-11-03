@@ -11,6 +11,7 @@ import {
   Ship,
   Position,
   AttackOutData,
+  BaseGameData,
 } from '../types';
 import { v4 as uuid_v4 } from 'uuid';
 
@@ -53,7 +54,7 @@ export class GameService {
 
     this.availableRooms[roomIdx].roomUsers.push(roomUser);
     const { roomUsers } = this.availableRooms[roomIdx];
-    const newGame: Game = { idGame: roomId, gamePLayers: roomUsers.map(player => ({ player, ships: [] })) };
+    const newGame: Game = { idGame: roomId, gamePLayers: roomUsers.map(player => ({ player, ships: [], shots: [] })) };
     this.availableRooms.splice(roomIdx);
     this.games.push(newGame);
     return newGame;
@@ -73,18 +74,46 @@ export class GameService {
     return this.games.find(game => game.idGame === idGame)?.gamePLayers.every(player => !!player.ships.length);
   }
 
-  attack(attackData: AttackInData): (currentPlayer: string | number) => AttackOutData {
+  attack(attackData: AttackInData): AttackOutData & { enemyId: string | number | undefined } {
     const { gameId, x, y, indexPlayer } = attackData;
-    const enemyShips =
-      this.games.find(game => game.idGame === gameId)?.gamePLayers.find(item => item.player.index !== indexPlayer)
-        ?.ships ?? [];
+    const game = this.games.find(game => game.idGame === gameId);
+    const enemy = game?.gamePLayers.find(item => item.player.index !== indexPlayer);
+    const enemyShips = enemy?.ships ?? [];
+
+    const client = game?.gamePLayers.find(item => item.player.index === indexPlayer);
+    const clientShots = client?.shots ?? [];
+    clientShots.push({ x, y });
 
     const isShot = enemyShips.some(ship => this.checkShipIsShot(ship, { x, y }));
-    return (currentPlayer: string | number) => ({
+
+    return {
       position: { x, y },
       status: isShot ? 'shot' : 'miss',
-      currentPlayer,
-    });
+      currentPlayer: indexPlayer,
+      enemyId: enemy?.player.index,
+    };
+  }
+
+  randomAttack(attackData: BaseGameData): AttackInData {
+    const { gameId, indexPlayer } = attackData;
+    const game = this.games.find(game => game.idGame === gameId);
+
+    const client = game?.gamePLayers.find(item => item.player.index === indexPlayer);
+    const clientShots = client?.shots ?? [];
+    const randomShots = [];
+
+    for (let x = 0; x < 10; x++) {
+      for (let y = 0; y < 10; y++) {
+        randomShots.push({ x, y });
+      }
+    }
+
+    const { x, y } = randomShots.find(({ x, y }) => !clientShots.some(shot => shot.x !== x && shot.y !== y)) ?? {
+      x: 0,
+      y: 0,
+    };
+
+    return { gameId, indexPlayer, x, y };
   }
 
   checkShipIsShot(ship: Ship, shotPosition: Position) {
@@ -96,6 +125,26 @@ export class GameService {
     };
 
     return shipObj.x.some(value => value === x) && shipObj.y.some(value => value === y);
+  }
+
+  checkIsRightTurn({
+    nextPlayerId,
+    currentShoter,
+  }: {
+    nextPlayerId: string | number | undefined;
+    currentShoter: string | number;
+  }) {
+    return nextPlayerId === currentShoter;
+  }
+
+  saveNextPlayer({ id, gameId }: { id: string | number; gameId: string | number }) {
+    const game = this.games.find(game => game.idGame === gameId);
+    if (game) game.nextPlayerId = id;
+  }
+
+  getNextPlayer(gameId: string | number) {
+    const game = this.games.find(game => game.idGame === gameId);
+    return game?.nextPlayerId;
   }
 
   getAvailableRooms() {

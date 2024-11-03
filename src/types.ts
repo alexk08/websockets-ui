@@ -45,7 +45,8 @@ export type Room = {
 
 export type Game = {
   idGame: number | string;
-  gamePLayers: { player: Player; ships: Ship[] }[];
+  gamePLayers: { player: Player; ships: Ship[]; shots: Position[] }[];
+  nextPlayerId?: number | string;
 };
 
 export type GameMsg = {

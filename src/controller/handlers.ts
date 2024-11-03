@@ -1,7 +1,7 @@
 import { WebSocket } from 'ws';
 import { PlayerError } from '../error';
 import { GameService } from '../services';
-import { PlayerData, PlayerDataOut, AddShipData, Room, AttackInData } from '../types';
+import { PlayerData, PlayerDataOut, AddShipData, Room, AttackInData, BaseGameData } from '../types';
 import { formatOutMsg, log } from '../utils';
 import { ws } from '../ws_server';
 
@@ -59,46 +59,59 @@ export const handleAddUserToRoom = ({ clientId, room }: HandleParams & { room: R
   log('create_game', createdGame);
 };
 
-export const handleAddShips = ({ shipData }: HandleParams & { shipData: AddShipData }) => {
+export const handleAddShips = ({ clientId, shipData }: HandleParams & { shipData: AddShipData }) => {
   const currentGame = game.addShips(shipData);
-  if (!game.checkGameIsReady(shipData.gameId)) return;
+  if (!game.checkGameIsReady(shipData.gameId) || !clientId || !currentGame) return;
 
-  currentGame?.gamePLayers.forEach(item => {
+  const turnData = { currentPlayer: clientId };
+  game.saveNextPlayer({ id: clientId, gameId: currentGame.idGame });
+  currentGame.gamePLayers.forEach(item => {
     if (item.player.socket.readyState === WebSocket.OPEN) {
       const msg = formatOutMsg({
         data: { ships: item.ships, currentPlayerIndex: item.player.index },
         type: 'start_game',
       });
-      const turnMsg = formatOutMsg({ type: 'turn', data: { currentPlayer: item.player.index } });
+      const turnMsg = formatOutMsg({ type: 'turn', data: turnData });
       item.player.socket.send(msg);
       item.player.socket.send(turnMsg);
     }
   });
 
   log('start_game', currentGame);
-  log('turn');
+  log('turn', turnData);
 };
 
-export const handleAttack = ({ attackData, clientId }: HandleParams & { attackData: AttackInData }) => {
-  if (!clientId) return;
-  const resultOfAttack = game.attack(attackData);
+export const handleAttack = ({ attackData }: { attackData: AttackInData }) => {
+  const nextPlayerId = game.getNextPlayer(attackData.gameId);
+  if (!game.checkIsRightTurn({ nextPlayerId, currentShoter: attackData.indexPlayer })) return;
+  const { enemyId, ...resultOfAttack } = game.attack(attackData);
+
+  if (!enemyId) return;
   const currentGame = game.getGames().find(game => game.idGame === attackData.gameId);
+  const turnData = { currentPlayer: resultOfAttack.status === 'miss' ? enemyId : attackData.indexPlayer };
+  game.saveNextPlayer({ gameId: attackData.gameId, id: turnData.currentPlayer });
 
   currentGame?.gamePLayers.forEach(item => {
     if (item.player.socket.readyState === WebSocket.OPEN) {
       const msg = formatOutMsg({
-        data: resultOfAttack(item.player.index),
+        data: resultOfAttack,
         type: 'attack',
       });
-      const turnMsg = formatOutMsg({ type: 'turn', data: { currentPlayer: item.player.index } });
+      const turnMsg = formatOutMsg({ type: 'turn', data: turnData });
       item.player.socket.send(msg);
       item.player.socket.send(turnMsg);
-
-      log('attack', resultOfAttack(item.player.index));
     }
   });
 
-  log('turn');
+  log('attack', resultOfAttack);
+  log('turn', turnData);
+};
+
+export const handleRandomAttack = ({ attackData }: { attackData: BaseGameData }) => {
+  const nextPlayerId = game.getNextPlayer(attackData.gameId);
+  if (!game.checkIsRightTurn({ nextPlayerId, currentShoter: attackData.indexPlayer })) return;
+  const randomAttackData = game.randomAttack(attackData);
+  handleAttack({ attackData: randomAttackData });
 };
 
 export const handleUpdateWinners = () => {
